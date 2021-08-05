@@ -9,9 +9,14 @@
  */
 public class Hello {
 
-    public static void main(String[] args) {
-        Hello hello = new Hello();
-        hello.test();
+    private static String test;
+
+    static {
+        test = "这是一个测试方法工具类";
+    }
+
+    public static void printTest(){
+        System.out.println("打印测试字符串: " + test);
     }
 
     /**
