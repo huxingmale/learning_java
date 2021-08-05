@@ -1,6 +1,9 @@
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * @Description: xlcass文件创建
@@ -19,6 +22,8 @@ public class MyXlassCreate {
         String filePath = xlassCreate.getClass().getClassLoader().getResource("").getPath();
         // 创建一个xlass文件
         xlassCreate.createXlass(filePath);
+        // 生成xar压缩文件包
+        xlassCreate.createXar();
     }
 
     /**
@@ -66,5 +71,28 @@ public class MyXlassCreate {
         }
         // 返回解密后字节长度
         return targetArray;
+    }
+
+    /**
+     * @Description: 生成xar压缩文件包
+     * @Author: huxing
+     * @param
+     * @Date: 2021/8/5 下午5:27
+     **/
+    private void createXar(){
+        // 压缩文件路径
+        String filePath = System.getProperty("user.dir") + "/doc/";
+        // 压缩文件名
+        String zipName = filePath + "xlass.zip";
+        // 压缩文件包名
+        File zipFile = new File(zipName);
+        // 打包文件
+        List<File> fileList = new ArrayList<>();
+        fileList.add(new File(filePath + "Hello.xlass"));
+        ZipUtil.toZip(fileList, zipFile);
+        // 修改文件名
+        File xarFile = new File(filePath + "xlass.xar");
+        // 修改文件名
+        zipFile.renameTo(xarFile);
     }
 }
