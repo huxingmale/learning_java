@@ -2,6 +2,7 @@ import java.io.*;
 import java.lang.reflect.Method;
 import java.nio.charset.Charset;
 import java.util.Objects;
+import java.util.Scanner;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -16,6 +17,8 @@ import java.util.zip.ZipInputStream;
  */
 public class MyXlassLoader extends ClassLoader {
 
+    /** 字节码文件加载模式 1: 文件形式, 2: 压缩包形式 默认是1 **/
+    public static int loadModule = 1;
     /**
      * @Description:  main方法
      * @Author: huxing
@@ -24,6 +27,13 @@ public class MyXlassLoader extends ClassLoader {
      * @return: void
      **/
     public static void main(String[] args) throws Exception{
+        Scanner scan = new Scanner(System.in);
+        System.out.println("**** 字节码加载模式选择 *****");
+        System.out.println(" 1: 通过文件读取方式加载");
+        System.out.println(" 2: 通过压缩包获取方式加载");
+        System.out.println("****************************");
+        System.out.print("请选择加载模式: ");
+        loadModule = scan.nextInt();
         // 加载类名
         final String className = "Hello";
         // 初始化对象
@@ -49,8 +59,8 @@ public class MyXlassLoader extends ClassLoader {
      **/
     @Override
     protected Class<?> findClass(String name) throws ClassNotFoundException {
-        // TODO: 通过字节码模式加载类, 1: 文件形式, 2: 压缩包形式
-        return loadByteCodeFile(name, 2);
+        // TODO: 通过字节码模式加载类
+        return loadByteCodeFile(name, loadModule);
     }
 
     /**
