@@ -48,6 +48,8 @@ public class MyXlassLoader extends ClassLoader {
         xlassLoader.invoke(classz, "hello");
         // 调用test方法
         xlassLoader.invoke(classz, "test");
+        // 关闭输入
+        scan.close();
     }
 
     /**
