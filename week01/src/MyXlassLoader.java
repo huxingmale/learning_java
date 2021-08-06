@@ -29,10 +29,6 @@ public class MyXlassLoader extends ClassLoader {
         final String className = "Hello";
         // 初始化对象
         MyXlassLoader xlassLoader = new MyXlassLoader();
-        // 文件路径
-        String filePath=System.getProperty("user.dir") + "/doc/";
-        // 打印记录
-        System.out.println("文件路径: " + filePath);
         // 加载xlass文件
         Class<?> classz = xlassLoader.loadClass(className);
         // 打印方法名
@@ -54,10 +50,14 @@ public class MyXlassLoader extends ClassLoader {
      **/
     @Override
     protected Class<?> findClass(String name) throws ClassNotFoundException {
+        // 文件路径
+        String filePath=System.getProperty("user.dir") + "/doc/";
+        // 打印记录
+        System.out.println("文件路径: " + filePath);
         // 默认采用xar包模式加载
         return loadByXar(name);
         // 通过直接读取文件的方式加载
-//        return loadByFile(name);
+//        return loadByFile(filePath, name);
     }
 
     /**
@@ -68,12 +68,13 @@ public class MyXlassLoader extends ClassLoader {
      * @Date: 2021/8/5 下午5:04
      **/
     private Class<?> loadByXar(String name) throws ClassNotFoundException{
+        System.out.println("通过压缩包加载字节码类文件");
         // 当前路径名 如果输入带包名做路径转换
         String resourcePath = name.replace(".", "/");
         // 后缀名
         final String suffix = ".xlass";
         // 加载文件
-        return reloadXarFile(resourcePath + suffix);
+        return reloadXarFile(resourcePath + suffix, name);
     }
 
     /**
@@ -83,14 +84,16 @@ public class MyXlassLoader extends ClassLoader {
      * @return java.lang.Class<?>
      * @Date: 2021/8/5 下午5:06
      **/
-    private Class<?> loadByFile(String name) throws ClassNotFoundException{
+    private Class<?> loadByFile(String filePath, String name) throws ClassNotFoundException{
+        System.out.println("通过路径加载字节码类文件");
         // 当前路径名 如果输入带包名做路径转换
         String resourcePath = name.replace(".", "/");
         // 后缀名
         final String suffix = ".xlass";
         // 读入文件流
-        InputStream inputStream = this.getClass().getResourceAsStream(resourcePath + suffix);
+        FileInputStream inputStream = null;
         try {
+            inputStream = new FileInputStream(filePath + resourcePath + suffix);
             // 字节流长度
             int length = inputStream.available();
             // 定义字节数组
@@ -126,18 +129,36 @@ public class MyXlassLoader extends ClassLoader {
     }
 
     /**
+     * @Description:   字节码加密
+     * @Author: huxing
+     * @Date: 2021-06-28 09:49
+     * @param byteArray:
+     * @return: byte[]
+     **/
+    public static byte[] encode(byte[] byteArray){
+        // 定义一个解密字节数组长度
+        byte[] targetArray = new byte[byteArray.length];
+        // 转义长度
+        for (int i=0; i<byteArray.length; i++){
+            targetArray[i] = (byte)(255 - byteArray[i]);
+        }
+        // 返回解密后字节长度
+        return targetArray;
+    }
+
+    /**
      * @Description:  字节码解密
      * @Author: huxing
      * @Date: 2021-06-28 09:47
      * @param byteArray:
      * @return: byte[]
      **/
-    private static byte[] decode(byte[] byteArray){
+    public static byte[] decode(byte[] byteArray){
         // 定义一个解密字节数组长度
         byte[] targetArray = new byte[byteArray.length];
         // 转义长度
         for (int i=0; i<byteArray.length; i++){
-            targetArray[i] = (byte)((byteArray[i] & 0XFF) << 8);
+            targetArray[i] = (byte)(255 - byteArray[i]);
         }
         // 返回解密后字节长度
         return targetArray;
@@ -167,7 +188,7 @@ public class MyXlassLoader extends ClassLoader {
      * @Date: 2021/8/5 下午4:36
      **/
     @SuppressWarnings("all")
-    private Class<?> reloadXarFile(String fileName) throws ClassNotFoundException{
+    private Class<?> reloadXarFile(String fileName, String name) throws ClassNotFoundException{
         // 压缩文件路径
         String filePath = System.getProperty("user.dir") + "/doc/";
         // 文件输入流
@@ -183,31 +204,31 @@ public class MyXlassLoader extends ClassLoader {
             //循环遍历
             while ((ze = zipInputStream.getNextEntry()) != null) {
                 System.out.println("文件名：" + ze.getName() + " 文件大小：" + ze.getSize() + " bytes");
+                ByteArrayOutputStream bos = new ByteArrayOutputStream();
                 // 读取到了文件
                 if (Objects.equals(fileName, ze.getName())){
-                    //读取
-                    BufferedReader br = new BufferedReader(new
-                            InputStreamReader(zipInputStream, StandardCharsets.UTF_8));
-                    String line;
-                    //内容不为空，输出
-                    while ((line = br.readLine()) != null) {
-                        System.out.println(line);
+                    //文件输出流
+                    int len;
+                    byte[] buf = new byte[1024];
+                    while ((len = zipInputStream.read(buf)) != -1) {
+                        bos.write(buf, 0, len);
                     }
+                    byte[] byteArray = bos.toByteArray();
+                    System.out.println("字节码长度: " + byteArray.length);
                     // 解析处理字节数组
-                    byte[] classByte = decode(line.getBytes(StandardCharsets.UTF_8));
-                    // 根据字节加载类
-                    return defineClass(ze.getName(), classByte, 0, classByte.length);
+                    byte[] classByte = decode(byteArray);
+                    // 根据字节加载类 TODO: 注意这里是类名，不要跟文件名搞混了
+                    return defineClass(name, classByte, 0, classByte.length);
                 }
             }
-            // 压缩包内没有文件 返回空
             return null;
         } catch (Exception ex){
-            throw new ClassNotFoundException(fileName, ex);
+            throw new ClassNotFoundException(name, ex);
         } finally {
             // 关闭流
             try {
                 zipInputStream.closeEntry();
-                input.close();
+                MyXlassLoader.close(input);
             } catch (Exception ex){
                 ex.printStackTrace();
             }

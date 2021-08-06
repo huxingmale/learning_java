@@ -18,10 +18,8 @@ public class MyXlassCreate {
     public static void main(String[] args) {
         // 初始化对象
         MyXlassCreate xlassCreate = new MyXlassCreate();
-        // 文件路径
-        String filePath = xlassCreate.getClass().getClassLoader().getResource("").getPath();
         // 创建一个xlass文件
-        xlassCreate.createXlass(filePath);
+        xlassCreate.createXlass(ZipUtil.filePath);
         // 生成xar压缩文件包
         xlassCreate.createXar();
     }
@@ -42,8 +40,9 @@ public class MyXlassCreate {
             inputStream = new FileInputStream(filePath + "Hello.class");
             int length = inputStream.available();
             byte[] byteArray = new byte[length];
-            byte[] classzArray = MyXlassCreate.encode(byteArray);
-            // 写入Hello.xlass文件
+            // 读入文件字节流 TODO: 前面这里忘记加了
+            inputStream.read(byteArray);
+            byte[] classzArray = MyXlassLoader.encode(byteArray);
             String outFilePath = System.getProperty("user.dir") + "/doc/";
             outputStream = new FileOutputStream(outFilePath + "Hello.xlass");
             outputStream.write(classzArray);
@@ -56,43 +55,25 @@ public class MyXlassCreate {
     }
 
     /**
-     * @Description:   字节码加密
-     * @Author: huxing
-     * @Date: 2021-06-28 09:49
-     * @param byteArray:
-     * @return: byte[]
-     **/
-    private static byte[] encode(byte[] byteArray){
-        // 定义一个解密字节数组长度
-        byte[] targetArray = new byte[byteArray.length];
-        // 转义长度
-        for (int i=0; i<byteArray.length; i++){
-            targetArray[i] = (byte)((byteArray[i] & 0XFF) << 8);
-        }
-        // 返回解密后字节长度
-        return targetArray;
-    }
-
-    /**
      * @Description: 生成xar压缩文件包
      * @Author: huxing
      * @param
      * @Date: 2021/8/5 下午5:27
      **/
     private void createXar(){
-        // 压缩文件路径
-        String filePath = System.getProperty("user.dir") + "/doc/";
         // 压缩文件名
-        String zipName = filePath + "xlass.zip";
+        String zipName = ZipUtil.filePath + "xlass.zip";
         // 压缩文件包名
         File zipFile = new File(zipName);
         // 打包文件
         List<File> fileList = new ArrayList<>();
-        fileList.add(new File(filePath + "Hello.xlass"));
+        fileList.add(new File(ZipUtil.filePath + "Hello.xlass"));
         ZipUtil.toZip(fileList, zipFile);
         // 修改文件名
-        File xarFile = new File(filePath + "xlass.xar");
+        File xarFile = new File(ZipUtil.filePath + "xlass.xar");
         // 修改文件名
-        zipFile.renameTo(xarFile);
+        if (zipFile.renameTo(xarFile)){
+            System.out.println("文件打包压缩成功");
+        }
     }
 }
