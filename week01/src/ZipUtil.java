@@ -1,10 +1,8 @@
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
 /**
@@ -18,6 +16,9 @@ import java.util.zip.ZipOutputStream;
 public class ZipUtil {
 
     public static final int BUFFER_SIZE = 4096;
+
+    /** 压缩文件路径 **/
+    public static final String filePath = System.getProperty("user.dir") + "/doc/";
 
     /**
      * 把文件集合打成zip压缩包
@@ -68,9 +69,30 @@ public class ZipUtil {
         }
     }
 
+    public static void unZip(String filePath) throws Exception{
+        //读取压缩文件
+        ZipInputStream in = new ZipInputStream(new FileInputStream(filePath + "xlass.xar"));
+        //zip文件实体类
+        ZipEntry entry;
+        //遍历压缩文件内部 文件数量
+        while((entry = in.getNextEntry()) != null){
+            if(!entry.isDirectory()){
+                //文件输出流
+                FileOutputStream out = new FileOutputStream( filePath + entry.getName());
+                BufferedOutputStream bos = new BufferedOutputStream(out);
+                int len;
+                byte[] buf = new byte[1024];
+                while ((len = in.read(buf)) != -1) {
+                    bos.write(buf, 0, len);
+                }
+                // 关流顺序，先打开的后关闭
+                bos.close();
+                out.close();
+            }
+        }
+    }
+
     public static void main(String[] args) throws Exception {
-        // 压缩文件路径
-        String filePath = System.getProperty("user.dir") + "/doc/";
         // 压缩文件名
         String zipName = filePath + "xlass.zip";
         // 压缩文件包名
