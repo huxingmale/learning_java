@@ -1,7 +1,6 @@
 import java.io.*;
 import java.lang.reflect.Method;
 import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -50,50 +49,104 @@ public class MyXlassLoader extends ClassLoader {
      **/
     @Override
     protected Class<?> findClass(String name) throws ClassNotFoundException {
-        // 文件路径
-        String filePath=System.getProperty("user.dir") + "/doc/";
-        // 打印记录
-        System.out.println("文件路径: " + filePath);
-        // 默认采用xar包模式加载
-        return loadByXar(name);
-        // 通过直接读取文件的方式加载
-//        return loadByFile(filePath, name);
+        // TODO: 通过字节码模式加载类, 1: 文件形式, 2: 压缩包形式
+        return loadByteCodeFile(name, 2);
     }
 
     /**
-     * @Description: 通过读取路径文件加载xlass文件
+     * @Description:   字节码加载类
      * @Author: huxing
-     * @param name
+     * @param name  加载类名
+     * @param load  加载模式
      * @return java.lang.Class<?>
-     * @Date: 2021/8/5 下午5:04
+     * @Date: 2021/8/6 下午3:05
      **/
-    private Class<?> loadByXar(String name) throws ClassNotFoundException{
+    private Class<?> loadByteCodeFile(String name, int load) throws ClassNotFoundException{
+        // 当前文件路径名
+        String resourcePath =System.getProperty("user.dir") + "/doc/";
+        // 文件后缀后缀名
+        final String suffix = ".xlass";
+        if (load == 1){
+            // 通过文件模式加载字节码
+            return this.loadByFile(resourcePath + name + suffix, name);
+        } else if (load == 2){
+            // 通过压缩包模式加载字节码
+            return this.loadByXar(name + suffix, name);
+        } else {
+            return super.findClass(name);
+        }
+    }
+
+    /**
+     * @Description: 通过压缩包加载字节码类
+     * @Author: huxing
+     * @param fileName  文件名
+     * @param className 类名
+     * @return java.lang.Class<?>
+     * @Date: 2021/8/6 下午3:12
+     **/
+    private Class<?> loadByXar(String fileName, String className) throws ClassNotFoundException{
         System.out.println("通过压缩包加载字节码类文件");
-        // 当前路径名 如果输入带包名做路径转换
-        String resourcePath = name.replace(".", "/");
-        // 后缀名
-        final String suffix = ".xlass";
-        // 加载文件
-        return reloadXarFile(resourcePath + suffix, name);
+        // 压缩文件路径
+        String filePath = System.getProperty("user.dir") + "/doc/";
+        // 文件输入流
+        FileInputStream input = null;
+        //获取ZIP输入流(一定要指定字符集Charset.forName("GBK")否则会报java.lang.IllegalArgumentException: MALFORMED)
+        ZipInputStream zipInputStream = null;
+        //定义ZipEntry置为null,避免由于重复调用zipInputStream.getNextEntry造成的不必要的问题
+        ZipEntry ze = null;
+        try {
+            input = new FileInputStream(filePath + "xlass.xar");
+            zipInputStream = new ZipInputStream(new BufferedInputStream(input),
+                    Charset.forName("GBK"));
+            //循环遍历
+            while ((ze = zipInputStream.getNextEntry()) != null) {
+                System.out.println("文件名：" + ze.getName() + " 文件大小：" + ze.getSize() + " bytes");
+                ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                // 读取到了文件
+                if (Objects.equals(fileName, ze.getName())){
+                    //文件输出流
+                    int len;
+                    byte[] buf = new byte[1024];
+                    while ((len = zipInputStream.read(buf)) != -1) {
+                        bos.write(buf, 0, len);
+                    }
+                    byte[] byteArray = bos.toByteArray();
+                    System.out.println("字节码长度: " + byteArray.length);
+                    // 解析处理字节数组
+                    byte[] classByte = decode(byteArray);
+                    // 根据字节加载类 TODO: 注意这里是类名，不要跟文件名搞混了
+                    return defineClass(className, classByte, 0, classByte.length);
+                }
+            }
+            return null;
+        } catch (Exception ex){
+            throw new ClassNotFoundException(className, ex);
+        } finally {
+            // 关闭流
+            try {
+                zipInputStream.closeEntry();
+                MyXlassLoader.close(input);
+            } catch (Exception ex){
+                ex.printStackTrace();
+            }
+        }
     }
 
     /**
-     * @Description: 通过xar压缩包加载文件类文件
+     * @Description: 通过文件加载字节码
      * @Author: huxing
-     * @param name
+     * @param fileName   文件名
+     * @param className  类名
      * @return java.lang.Class<?>
-     * @Date: 2021/8/5 下午5:06
+     * @Date: 2021/8/6 下午3:09
      **/
-    private Class<?> loadByFile(String filePath, String name) throws ClassNotFoundException{
+    private Class<?> loadByFile(String fileName, String className) throws ClassNotFoundException{
         System.out.println("通过路径加载字节码类文件");
-        // 当前路径名 如果输入带包名做路径转换
-        String resourcePath = name.replace(".", "/");
-        // 后缀名
-        final String suffix = ".xlass";
         // 读入文件流
         FileInputStream inputStream = null;
         try {
-            inputStream = new FileInputStream(filePath + resourcePath + suffix);
+            inputStream = new FileInputStream(fileName);
             // 字节流长度
             int length = inputStream.available();
             // 定义字节数组
@@ -103,9 +156,9 @@ public class MyXlassLoader extends ClassLoader {
             // 解析处理字节数组
             byte[] classByte = decode(byteArray);
             // 根据字节加载类
-            return defineClass(name, classByte, 0, length);
+            return defineClass(className, classByte, 0, length);
         } catch (IOException ex){
-            throw new ClassNotFoundException(name, ex);
+            throw new ClassNotFoundException(className, ex);
         } finally {
             close(inputStream);
         }
@@ -176,60 +229,6 @@ public class MyXlassLoader extends ClassLoader {
             try {
                 res.close();
             } catch (IOException ex){
-                ex.printStackTrace();
-            }
-        }
-    }
-
-    /**
-     * @Description: 读取xar内的文件
-     * @Author: huxing
-     * @param
-     * @Date: 2021/8/5 下午4:36
-     **/
-    @SuppressWarnings("all")
-    private Class<?> reloadXarFile(String fileName, String name) throws ClassNotFoundException{
-        // 压缩文件路径
-        String filePath = System.getProperty("user.dir") + "/doc/";
-        // 文件输入流
-        FileInputStream input = null;
-        //获取ZIP输入流(一定要指定字符集Charset.forName("GBK")否则会报java.lang.IllegalArgumentException: MALFORMED)
-        ZipInputStream zipInputStream = null;
-        //定义ZipEntry置为null,避免由于重复调用zipInputStream.getNextEntry造成的不必要的问题
-        ZipEntry ze = null;
-        try {
-            input = new FileInputStream(filePath + "xlass.xar");
-            zipInputStream = new ZipInputStream(new BufferedInputStream(input),
-                    Charset.forName("GBK"));
-            //循环遍历
-            while ((ze = zipInputStream.getNextEntry()) != null) {
-                System.out.println("文件名：" + ze.getName() + " 文件大小：" + ze.getSize() + " bytes");
-                ByteArrayOutputStream bos = new ByteArrayOutputStream();
-                // 读取到了文件
-                if (Objects.equals(fileName, ze.getName())){
-                    //文件输出流
-                    int len;
-                    byte[] buf = new byte[1024];
-                    while ((len = zipInputStream.read(buf)) != -1) {
-                        bos.write(buf, 0, len);
-                    }
-                    byte[] byteArray = bos.toByteArray();
-                    System.out.println("字节码长度: " + byteArray.length);
-                    // 解析处理字节数组
-                    byte[] classByte = decode(byteArray);
-                    // 根据字节加载类 TODO: 注意这里是类名，不要跟文件名搞混了
-                    return defineClass(name, classByte, 0, classByte.length);
-                }
-            }
-            return null;
-        } catch (Exception ex){
-            throw new ClassNotFoundException(name, ex);
-        } finally {
-            // 关闭流
-            try {
-                zipInputStream.closeEntry();
-                MyXlassLoader.close(input);
-            } catch (Exception ex){
                 ex.printStackTrace();
             }
         }
