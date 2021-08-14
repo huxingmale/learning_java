@@ -1,0 +1,35 @@
+GC日志解读分析 几个常见的GC处理日志信息和基础解读见链接：https://blog.csdn.net/huxingmale/article/details/119700655
+
+以下是我个人的一些总结：
+
+首先jvm的堆内存参数只是一个设置值，实际运行当中目前统计下来是你设置的参数的95%大小，不知道是否和内存大小计算有关，一般来说jvm运行大小建议至少256m，设置过小很容易触发OOM的出现。  低内存（256m～以下）     在256m这个大小的堆内存下运行jvm，整体来说从GC运行效率来说并行GC>CMSGC>串行GC，每次处理的耗时和触发FullGC的概率都是非常优秀的，但是从触发FullGC这点来说不得不说CMSGC特别的强，在256M的堆内存环境运行下，它竟然可以一次都不触发，整体的回收效率非常的优秀，但是因为本身针对老年代的回收上它耗费了更多的cpu资源和时间，所以略逊并行GC一筹。同时，因为并行GC有一个自适应的默认参数，可以通过日志解读发现，当JVM启动的时候堆内存是最大的251392K，
+
+2021-08-14T14:56:24.102-0800: [GC (Allocation Failure) [PSYoungGen: 65452K->10749K(76288K)] 65452K->24321K(251392K), 0.0098329 secs] [Times: user=0.01 sys=0.05, real=0.01 secs]
+
+但是当运行一段时间后我们会惊讶的发现
+
+2021-08-14T14:56:24.273-0800: [GC (Allocation Failure) [PSYoungGen: 76055K->10742K(40448K)] 178632K->137696K(215552K), 0.0147039 secs] [Times: user=0.03 sys=0.05, real=0.01 secs]
+
+没错，总内存变小了，这里是因为自适应参数的存在，GC的过程中并行算法会根据运行情况自动分配年轻代中的eden区和缓冲区的大小比例，如下：
+
+2021-08-14T14:56:24.293-0800: [GC (Allocation Failure) [PSYoungGen: 40298K->17295K(58368K)] 167252K->147144K(233472K), 0.0028745 secs] [Times: user=0.01 sys=0.00, real=0.00 secs]  2021-08-14T14:56:24.300-0800: [GC (Allocation Failure) [PSYoungGen: 46991K->26339K(58368K)] 176840K->159304K(233472K), 0.0067433 secs] [Times: user=0.03 sys=0.01, real=0.00 secs]
+
+在执行几次以后，jvm认为这个大小的比例是当前合理稳定的，于是保存下来。为了验证我这个想法，我在执行参数中加入了关闭自适应参数-XX:-UseAdaptiveSizePolicy ，于是符合预期想法，jvm运行过程中堆内存的整体大小不在变化。
+
+具体区别如下图：
+
+未关闭自适应参数前： Heap  PSYoungGen      total 58368K, used 29202K [0x00000007bab00000, 0x00000007c0000000, 0x00000007c0000000)   eden space 29696K, 98% used [0x00000007bab00000,0x00000007bc784ab8,0x00000007bc800000)   from space 28672K, 0% used [0x00000007be400000,0x00000007be400000,0x00000007c0000000)   to   space 28672K, 0% used [0x00000007bc800000,0x00000007bc800000,0x00000007be400000)  ParOldGen       total 175104K, used 174912K [0x00000007b0000000, 0x00000007bab00000, 0x00000007bab00000)   object space 175104K, 99% used [0x00000007b0000000,0x00000007baad00e8,0x00000007bab00000)  Metaspace       used 2686K, capacity 4486K, committed 4864K, reserved 1056768K   class space    used 294K, capacity 386K, committed 512K, reserved 1048576K
+
+关闭自适应参数后： Heap  PSYoungGen      total 76288K, used 62646K [0x00000007bab00000, 0x00000007c0000000, 0x00000007c0000000)   eden space 65536K, 95% used [0x00000007bab00000,0x00000007be82db48,0x00000007beb00000)   from space 10752K, 0% used [0x00000007beb00000,0x00000007beb00000,0x00000007bf580000)   to   space 10752K, 0% used [0x00000007bf580000,0x00000007bf580000,0x00000007c0000000)  ParOldGen       total 175104K, used 174706K [0x00000007b0000000, 0x00000007bab00000, 0x00000007bab00000)   object space 175104K, 99% used [0x00000007b0000000,0x00000007baa9c898,0x00000007bab00000)  Metaspace       used 2686K, capacity 4486K, committed 4864K, reserved 1056768K   class space    used 294K, capacity 386K, committed 512K, reserved 1048576K
+
+第一次GC的时候
+
+2021-08-14T16:31:58.330-0800: [GC (Allocation Failure) [PSYoungGen: 65536K->10749K(76288K)] 65536K->21765K(251392K), 0.0099438 secs] [Times: user=0.01 sys=0.05, real=0.01 secs]
+
+why？ 不太清楚原理。
+
+中内存（512m-1g）         在这个堆内存阀值下，串行GC首先被排除，运行效率低，GC暂停时间长。由于G1GC在256M下直接就会OOM，所以起步就用了512M，在这个环境下个人感觉从现在开始G1GC的效率开始碾压其他几个GC了，如果说G1GC有什么缺点的话，可能就是它的详细GC日志比较难以解读，从纯日志层面上不如并行GC和CMSGC好解读。
+
+        同样的在日志层面上并行GC和CMSGC的处理效率差别在512m这个阀值上区别并不大，但是当你的堆内存大小提高到1G以后，并行GC的每次处理时间明显的增高，同时并行GC在GC的过程中会进行STW，所以在可以选择的情况下个人觉的还是使用CMS GC比较合适。G1的话虽然性能非常优越，但是在这个层级上性能提升不是特别的大，日志又比较难以解读和监控，考虑到维护成本的业务场景下，个人觉的还是优先考虑CMS GC。
+
+大内存（2G～以上）         一般的java服务jvm运行内存其实不需要这么高，如果需要开到这么高的堆内存阀值的情况下，这个服务一般有以下特性：1. 高吞吐 2. 高并发，所以在这个层面上考虑的性能的最优化，G1GC我觉的最好的垃圾回收算法。
