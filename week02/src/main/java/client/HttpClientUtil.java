@@ -7,6 +7,7 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.util.EntityUtils;
+import server.HttpServerStart;
 
 import java.io.IOException;
 
@@ -20,22 +21,14 @@ import java.io.IOException;
  */
 public class HttpClientUtil {
 
-    /** url 模版 **/
-    private final String url = "http://%s:%s/";
-
     /**
-     * @Description: 生成url访问连接
+     * @Description: Http 请求处理
      * @Author: huxing
      * @param ip
      * @param port
-     * @return java.lang.String
-     * @Date: 2021/8/15 下午7:22
+     * @Date: 2021/8/15 下午9:11
      **/
-    private String formatURL(String ip, int port){
-        return String.format(url, ip, port);
-    }
-
-    public void doGetTest(String ip, int port){
+    public void sendHttpRequest(String ip, int port){
         // 获得Http客户端
         CloseableHttpClient httpClient = HttpClientBuilder.create().build();
         // 创建Get请求
@@ -69,12 +62,29 @@ public class HttpClientUtil {
         }
     }
 
+    /** url 模版 **/
+    private final String url = "http://%s:%s/";
+
+    /**
+     * @Description: 生成url访问连接
+     * @Author: huxing
+     * @param ip
+     * @param port
+     * @return java.lang.String
+     * @Date: 2021/8/15 下午7:22
+     **/
+    private String formatURL(String ip, int port){
+        return String.format(url, ip, port);
+    }
+
     public static void main(String[] args) {
+        // 先启动 3个http 服务
+        new HttpServerStart().run();
         // 访问nio1
-        new HttpClientUtil().doGetTest("localhost", 8801);
+        new HttpClientUtil().sendHttpRequest("localhost", 8801);
         // 访问nio2
-        new HttpClientUtil().doGetTest("localhost", 8802);
+        new HttpClientUtil().sendHttpRequest("localhost", 8802);
         // 访问nio3
-        new HttpClientUtil().doGetTest("localhost", 8803);
+        new HttpClientUtil().sendHttpRequest("localhost", 8803);
     }
 }
