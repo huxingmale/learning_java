@@ -74,27 +74,27 @@ public class ServerChannelHandlerAdapter extends ChannelInboundHandlerAdapter {
         ctx.flush();
     }
 
-    /**
-     * 触发器
-     *
-     * @param channelHandlerContext channelHandlerContext
-     * @param evt
-     * @throws Exception exception
-     */
-    @Override
-    public void userEventTriggered(ChannelHandlerContext channelHandlerContext, Object evt) throws Exception {
-        log.info("{} -> [已经有5秒中没有接收到客户端的消息了]", this.getClass().getName());
-        if (evt instanceof IdleStateEvent) {
-            IdleStateEvent idleStateEvent = (IdleStateEvent) evt;
-            if (idleStateEvent.state() == IdleState.READER_IDLE) {
-                lossConnectCount++;
-                if (lossConnectCount > 2) {
-                    log.info("{} -> [释放不活跃通道] {}", this.getClass().getName(), channelHandlerContext.channel().id());
-                    channelHandlerContext.channel().close();
-                }
-            }
-        } else {
-            super.userEventTriggered(channelHandlerContext, evt);
-        }
-    }
+//    /**
+//     * 触发器
+//     *
+//     * @param channelHandlerContext channelHandlerContext
+//     * @param evt
+//     * @throws Exception exception
+//     */
+//    @Override
+//    public void userEventTriggered(ChannelHandlerContext channelHandlerContext, Object evt) throws Exception {
+//        log.info("{} -> [已经有5秒中没有接收到客户端的消息了]", this.getClass().getName());
+//        if (evt instanceof IdleStateEvent) {
+//            IdleStateEvent idleStateEvent = (IdleStateEvent) evt;
+//            if (idleStateEvent.state() == IdleState.READER_IDLE) {
+//                lossConnectCount++;
+//                if (lossConnectCount > 2) {
+//                    log.info("{} -> [释放不活跃通道] {}", this.getClass().getName(), channelHandlerContext.channel().id());
+//                    channelHandlerContext.channel().close();
+//                }
+//            }
+//        } else {
+//            super.userEventTriggered(channelHandlerContext, evt);
+//        }
+//    }
 }
